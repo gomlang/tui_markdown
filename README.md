@@ -81,5 +81,5 @@ A preflight traversal checks each child vector length before descending, counts 
 Tests cover block snapshots, Unicode/style boundaries, safe links and literal HTML, optional table escaping and alignment, cycles and resource limits, viewport/search behavior, snapshot isolation and selected-link visibility after resizing. Independent consumers exercise public composition with TUI. Native consumer tests check all 1,110 retained independent layout cases plus eight resource-limit rejection cases. The native GoML PTY verifier exercises Unicode columns, scrolling, code, tables, quotes, link selection, reflow and terminal restoration through a real Linux PTY.
 
 ```sh
-just ecosystem-test tui_markdown
+(cd ../verification && just ecosystem-test tui_markdown)
 ```
