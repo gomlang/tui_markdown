@@ -75,3 +75,24 @@ fn selected_link_remains_visible_after_width_reflow() -> () {
     testing::expect_ok(viewer.draw(buffer, buffer.area()), "resize");
     testing::assert(buffer.lines().join("\n").contains("target"));
 }
+
+#[test]
+fn width_reflow_preserves_active_search_navigation_and_visibility() -> () {
+    let source = "hit first\n\nprefix words repeated across the narrower viewport\n\nhit second\n\nhit third";
+    let viewer = testing::expect_ok(
+        tui_markdown::Viewer::new(source, tui_markdown::Options::defaults(60)),
+        "viewer",
+    );
+    testing::assert_eq(testing::expect_ok(viewer.search("hit"), "search"), 3);
+    testing::assert(viewer.next_match(false));
+    let buffer = testing::expect_ok(tui::Buffer::new(12, 2), "narrow");
+    testing::expect_ok(viewer.draw(buffer, buffer.area()), "reflow");
+    testing::assert_eq(viewer.scroll_offset(), viewer.search_matches()[1].line);
+    testing::assert(buffer.lines().join("\n").contains("hit second"));
+    testing::assert(viewer.next_match(false));
+    testing::assert_eq(viewer.scroll_offset(), viewer.search_matches()[2].line - 1);
+    let tiny = testing::expect_ok(tui::Buffer::new(2, 2), "tiny");
+    testing::expect_ok(viewer.draw(tiny, tiny.area()), "remove wrapped matches");
+    testing::assert(viewer.search_matches().is_empty());
+    testing::assert(!viewer.next_match(false));
+}

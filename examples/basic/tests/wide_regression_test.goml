@@ -1,0 +1,23 @@
+package tests;
+
+use ecosystem::tui_markdown;
+use ecosystem::tui;
+use std::testing;
+
+#[test]
+fn imported_viewer_keeps_search_position_on_resize() -> () {
+    let viewer = testing::expect_ok(
+        tui_markdown::Viewer::new(
+            "hit first\n\nlong prefix text between the matches\n\nhit second\n\nlast",
+            tui_markdown::Options::defaults(60),
+        ),
+        "viewer",
+    );
+    testing::assert_eq(testing::expect_ok(viewer.search("hit"), "search"), 2);
+    testing::assert(viewer.next_match(false));
+    let buffer = testing::expect_ok(tui::Buffer::new(12, 2), "buffer");
+    testing::expect_ok(viewer.draw(buffer, buffer.area()), "draw");
+    testing::assert(buffer.lines().join("\n").contains("hit second"));
+    testing::assert(viewer.next_match(false));
+    testing::assert_eq(viewer.scroll_offset(), 0);
+}
