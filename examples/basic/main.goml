@@ -15,7 +15,7 @@ use std::utf8;
 use utf8::BytesUtf8;
 
 fn source() -> string {
-    "# Markdown Viewer\n\nHello **GoML** and 界👩‍💻.\n\n- first item\n- second item\n\n[Guide](https://example.org/guide)\n\n| Name | Value |\n| --- | ---: |\n| GoML | 界 |\n\n```gom\nlet ready = true;\n```\n\n> Safe terminal text\n\nLast paragraph."
+    "# Markdown Viewer\n\nHello **GoML** and 界👩‍💻.\n\n- first item\n- second item\n\n[Guide](https://example.org/guide)\n\n| Name | Value |\n| --- | ---: |\n| GoML | 界 |\n\n```goml\nlet ready = true;\n```\n\n> Safe terminal text\n\nLast paragraph."
 }
 
 pub fn exercise() -> () {

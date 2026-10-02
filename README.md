@@ -10,7 +10,7 @@ CommonMark terminal layout and an interactive TUI viewer implemented in GoML. It
 "ecosystem::terminal" = "0.1.0"
 ```
 
-```gom
+```goml
 use ecosystem::tui_markdown;
 use ecosystem::tui;
 use ecosystem::ansi;
@@ -86,7 +86,7 @@ Tests cover block snapshots, Unicode/style boundaries, safe links and literal HT
 
 ## Development and examples
 
-Requires GoML 0.1.55 or newer. The `examples/basic/` example shares the root manifest; test-only helpers are declared in `[dev-dependencies]`. From the library root, run:
+Requires GoML 0.1.56 or newer. The `examples/basic/` example shares the root manifest; test-only helpers are declared in `[dev-dependencies]`. From the library root, run:
 
 ```sh
 goml run --example basic

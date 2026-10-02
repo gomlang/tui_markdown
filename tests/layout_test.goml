@@ -16,12 +16,12 @@ fn rendered(source: string, width: isize) -> tui_markdown::Layout {
 #[test]
 fn commonmark_blocks_nested_containers_and_code_snapshot() -> () {
     let value = rendered(
-        "# Title\n\nHello **bold** and *em*.\n\n> quote\n>\n> - one\n> - two\n\n3. three\n4. four\n\n```gom\n  let x = 1;\n```\n\n---",
+        "# Title\n\nHello **bold** and *em*.\n\n> quote\n>\n> - one\n> - two\n\n3. three\n4. four\n\n```goml\n  let x = 1;\n```\n\n---",
         24,
     );
     testing::assert_eq(
         value.plain_text(),
-        "# Title\n\nHello bold and em.\n\n│ quote\n\n│ • one\n│ • two\n\n3. three\n4. four\n\n┌ gom\n│   let x = 1;\n└\n\n────────────────────────",
+        "# Title\n\nHello bold and em.\n\n│ quote\n\n│ • one\n│ • two\n\n3. three\n4. four\n\n┌ goml\n│   let x = 1;\n└\n\n────────────────────────",
     );
     let encoded = testing::expect_ok(
         value.render_ansi(ansi::Profile::TrueColor, false),
