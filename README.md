@@ -68,7 +68,7 @@ This extension is not full GFM. It does not recognize tables nested inside lists
 - `set_source(source)` replaces the document atomically after layout and search validation, then resets viewport and link selection. Failed replacements leave the existing viewer intact.
 - `snapshot()` copies the outer layout, each line's span storage and link storage. Editing a snapshot does not change the viewer.
 
-Link selection styling takes precedence over search styling on the same grapheme. Search offsets are byte offsets, while highlighting paints whole overlapping graphemes. After a width change the current query is rerun; the active search-match index resets. The viewer and its shared containers are intended for one event-loop thread and do not synchronize concurrent mutation.
+Link selection styling takes precedence over search styling on the same grapheme. Search offsets are byte offsets, while highlighting paints whole overlapping graphemes. After a width change the current query is rerun; the active match keeps its ordinal index, clamped to the remaining matches if wrapping removes matches. With no selected link, that match is scrolled into view. If no matches remain, active search navigation resets. Selected-link visibility takes precedence. The viewer and its shared containers are intended for one event-loop thread and do not synchronize concurrent mutation.
 
 The viewer does not own a terminal session. Draw it inside `tui::Terminal::draw`/`draw_with` and route input from that same terminal's `next_event`; close the session with a `defer`. The example includes a complete `--pty` event loop using this arrangement.
 

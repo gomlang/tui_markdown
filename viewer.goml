@@ -197,6 +197,7 @@ impl Viewer {
             return Result::Ok(())
         }
         let resized = area.width != self.options.get().width;
+        let active_match = self.match_index.get();
         if resized {
             let options = Options { width: area.width, ..self.options.get() };
             let current = layout(self.source.get(), options)?;
@@ -204,12 +205,20 @@ impl Viewer {
             self.options.set(options);
             self.current.set(current);
             self.matches.set(matches);
-            self.match_index.set(-1);
+            self.match_index.set(
+                if active_match >= 0 && !matches.is_empty() {
+                    minimum(active_match, matches.len() - 1)
+                } else {
+                    -1
+                },
+            );
         }
         self.height.set(area.height);
         if resized {
             if let Some(link) = self.selected_link() {
                 self.scroll_to(link.line);
+            } else if self.match_index.get() >= 0 {
+                self.scroll_to(self.matches.get()[self.match_index.get()].line);
             }
         }
         self.scroll_to(self.offset.get());
