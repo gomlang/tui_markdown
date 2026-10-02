@@ -1,6 +1,6 @@
 package tests;
 
-use consumer::tui_markdown as app;
+use ecosystem::tui_markdown::examples::basic as app;
 
 #[test]
 fn public_markdown_viewer_composes_with_tui() -> () {

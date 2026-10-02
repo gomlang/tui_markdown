@@ -7,7 +7,7 @@ Source: Independent word wrapping, paragraph, heading, quote, list, code, safe-l
 Seed: `20260921`. The input and expected values were extracted once from
 `ecosystem/tui_markdown/interop.py` at repository commit
 `27f8b1649561504bbe61d5247500e7cadc6eef42`, before invoking the GoML
-consumer. No expected value was captured from the implementation under test.
+example. No expected value was captured from the implementation under test.
 Python is not required to run or update native GoML tests; new reference cases
 can be added directly from independent calculations or the cited specification.
 
