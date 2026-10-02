@@ -1,0 +1,35 @@
+package tests;
+
+use ecosystem::ansi;
+use ecosystem::tui_markdown;
+use std::testing;
+
+#[test]
+fn single_column_wrapping_replaces_oversize_graphemes_and_keeps_links() -> () {
+    let layout = testing::expect_ok(
+        tui_markdown::layout(
+            "[**界👩‍💻**](https://example.org)",
+            tui_markdown::Options { link_numbers: false, ..tui_markdown::Options::defaults(1) },
+        ),
+        "narrow linked text",
+    );
+    testing::assert_eq(layout.plain_text(), "�\n�");
+    testing::assert_eq(layout.links.len(), 1);
+    for line in layout.lines {
+        testing::assert_eq(line.width(), 1);
+        let part = line.spans()[0];
+        testing::assert(part.style.attributes & ansi::BOLD != 0);
+        testing::assert(part.link.is_some());
+    }
+    let table = testing::expect_ok(
+        tui_markdown::layout(
+            "| x |\n| --- |\n| 界 |",
+            tui_markdown::Options { pipe_tables: true, ..tui_markdown::Options::defaults(3) },
+        ),
+        "single cell table",
+    );
+    testing::assert(table.plain_text().contains("│�│"));
+    for line in table.lines {
+        testing::assert_eq(line.width(), 3);
+    }
+}
