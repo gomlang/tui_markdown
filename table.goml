@@ -224,6 +224,8 @@ fn wrap_styled(text: ansi::StyledText, width: isize, options: Options) -> Result
     for part in text.graphemes(unicode_text::WidthOptions::new()) {
         let value = if part.text == "\t" {
             " ".repeat(8 - column % 8)
+        } else if part.width > width {
+            "�"
         } else {
             part.text
         };

@@ -37,7 +37,7 @@ Supported terminal presentations include:
 
 - ATX/Setext headings with level markers and hanging continuation indentation.
 - Paragraphs, nested emphasis/strong emphasis, code spans, hard/soft breaks and thematic separators.
-- Unicode-aware word wrapping that preserves graphemes and styles, including CJK and emoji; narrow columns never emit half a wide glyph.
+- Unicode-aware word wrapping that preserves graphemes and styles, including CJK and emoji; narrow columns never emit half a wide glyph. A grapheme wider than the entire available content column becomes U+FFFD, retaining its style and link, in paragraph and pipe-table wrapping as well as code blocks.
 - Fenced and indented code with language labels, preserved indentation and literal column wrapping. Syntax highlighting is not performed.
 - Nested block quotes and tight/loose ordered/unordered lists, preserving list start numbers and continuation indentation.
 - Inline/reference/autolinks, images represented by alt-text labels, optional numbered links and optional URL footnotes.
