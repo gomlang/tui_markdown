@@ -49,6 +49,9 @@ impl Build {
         (),
         Error,
     ] {
+        let prefix = prefix.truncate(self.options.width - 1).map_err(
+            |error| failure(error.to_string()),
+        )?;
         let available = maximum(1, self.options.width - prefix.width());
         let lines = content.wrap(available).map_err(|error| failure(error.to_string()))?;
         for value in lines {
@@ -65,6 +68,12 @@ impl Build {
         first_prefix: ansi::StyledText,
         rest_prefix: ansi::StyledText,
     ) -> Result[(), Error] {
+        let first_prefix = first_prefix.truncate(self.options.width - 1).map_err(
+            |error| failure(error.to_string()),
+        )?;
+        let rest_prefix = rest_prefix.truncate(self.options.width - 1).map_err(
+            |error| failure(error.to_string()),
+        )?;
         let prefix_width = maximum(first_prefix.width(), rest_prefix.width());
         let available = maximum(1, self.options.width - prefix_width);
         let lines = wrap_styled(content, available, self.options)?;
@@ -267,8 +276,10 @@ fn render_blocks(
                     let original = state.lines[before];
                     let line = prefix.snapshot();
                     line.append(span(marker, state.options.theme.text));
+                    let lead_width = minimum(lead.width(), state.options.width - 1);
+                    let line = line.truncate(lead_width).map_err(|error| failure(error.to_string()))?;
                     line.append(
-                        original.clip(lead.width(), maximum(0, state.options.width - lead.width())).map_err(
+                        original.clip(lead_width, state.options.width - lead_width).map_err(
                             |error| failure(error.to_string()),
                         )?,
                     );

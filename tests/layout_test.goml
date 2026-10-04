@@ -193,6 +193,27 @@ fn final_block_separator_does_not_consume_layout_limits() -> () {
 }
 
 #[test]
+fn narrow_prefixes_leave_room_for_heading_quote_list_and_code_content() -> () {
+    for source in["# XYZ", "> XYZ", "- XYZ", "3. XYZ", "> > # XYZ", "> > - XYZ"] {
+        testing::assert_eq(rendered(source, 1).plain_text(), "X\nY\nZ");
+    }
+    testing::assert_eq(rendered("```\nXYZ\n```", 1).plain_text(), "┌\nX\nY\nZ\n└");
+    let linked = testing::expect_ok(
+        tui_markdown::layout(
+            "> - [**界**](https://example.org)",
+            tui_markdown::Options { link_numbers: false, ..tui_markdown::Options::defaults(1) },
+        ),
+        "narrow nested link",
+    );
+    testing::assert_eq(linked.plain_text(), "�");
+    testing::assert_eq(linked.links.len(), 1);
+    testing::assert_eq(linked.links[0].line, 0);
+    let part = linked.lines[0].spans()[0];
+    testing::assert(part.style.attributes & ansi::BOLD != 0);
+    testing::assert(part.link.is_some());
+}
+
+#[test]
 fn nested_prefixes_at_narrow_width_remain_bounded() -> () {
     for width in 1..12 {
         let result = rendered(

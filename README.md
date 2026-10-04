@@ -49,6 +49,8 @@ Supported terminal presentations include:
 
 Line wrapping uses Unicode line-break opportunities, trims paragraph wrapping spaces, and breaks long words when necessary. Code blocks preserve spaces and wrap by columns. Width policies follow the Unicode module defaults. Rendering is left-to-right terminal layout; bidirectional shaping and font-specific width negotiation are not implemented.
 
+At narrow widths, heading, quote, list and code prefixes are clipped to leave at least one column for content. This also applies to deeply nested containers, so decorative indentation cannot hide all of a line's text.
+
 ## Optional pipe tables
 
 Set `Options { pipe_tables: true, ..Options::defaults(width) }` to enable a deliberately limited table extension in `layout(source, options)`. It recognizes a top-level paragraph whose first row and delimiter row contain pipes. Header/body rows must have equal cell counts; delimiter cells contain at least three hyphens with optional leading/trailing colons for left/center/right alignment.
