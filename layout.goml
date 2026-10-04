@@ -324,7 +324,11 @@ fn render_inlines(
                 result.push(ansi::Span { text, style, link });
             },
             Code(text) => {
-                result.push(ansi::Span { text, style: state.options.theme.code, link });
+                let code_style = ansi::Style {
+                    attributes: state.options.theme.code.attributes | style.attributes,
+                    ..state.options.theme.code,
+                };
+                result.push(ansi::Span { text, style: code_style, link });
             },
             Emphasis(children) => {
                 result.append(

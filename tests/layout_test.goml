@@ -51,6 +51,45 @@ fn unicode_word_wrapping_preserves_graphemes_and_style_boundaries() -> () {
 }
 
 #[test]
+fn inline_code_keeps_surrounding_emphasis_and_link_attributes() -> () {
+    let defaults = tui_markdown::Options::defaults(40);
+    let code_style = defaults.theme.code.with_attribute(ansi::REVERSE, true);
+    let layout = testing::expect_ok(
+        tui_markdown::layout(
+            "**`B`** *`I`* [**`L`**](https://example.org)",
+            tui_markdown::Options {
+                link_numbers: false,
+                theme: tui_markdown::Theme { code: code_style, ..defaults.theme },
+                ..defaults,
+            },
+        ),
+        "nested inline code",
+    );
+    let mut checked = 0;
+    for line in layout.lines {
+        for part in line.spans() {
+            let attributes = if part.text == "B" {
+                ansi::BOLD
+            } else if part.text == "I" {
+                ansi::ITALIC
+            } else if part.text == "L" {
+                ansi::BOLD | ansi::UNDERLINE
+            } else {
+                continue
+            };
+            testing::assert_eq(part.style.attributes & attributes, attributes);
+            testing::assert_eq(part.style.attributes & ansi::REVERSE, ansi::REVERSE);
+            testing::assert_eq(part.style.fg, code_style.fg);
+            if part.text == "L" {
+                testing::assert(part.link.is_some());
+            }
+            checked += 1;
+        }
+    }
+    testing::assert_eq(checked, 3);
+}
+
+#[test]
 fn links_images_references_numbering_and_safe_osc8() -> () {
     let source = "[GoML](https://example.org \"Docs\") and ![logo](logo.png), [ref].\n\n[ref]: /guide\n\n[blocked](javascript:alert(1))";
     let value = rendered(source, 80);
