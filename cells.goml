@@ -1,0 +1,232 @@
+package tui_markdown;
+
+use ecosystem::ansi;
+use ecosystem::unicode_text;
+
+fn cell_width(text: ansi::StyledText) -> isize {
+    let mut column = 0;
+    for part in text.graphemes(unicode_text::WidthOptions::new()) {
+        if part.text == "\n" {
+            break
+        }
+        column += if part.text == "\t" {
+            8 - column % 8
+        } else {
+            maximum(1, part.width)
+        };
+    }
+    column
+}
+
+fn cell_clip(text: ansi::StyledText, start: isize, columns: isize) -> ansi::StyledText {
+    let result = ansi::StyledText::new();
+    let mut column = 0;
+    for part in text.graphemes(unicode_text::WidthOptions::new()) {
+        if part.text == "\n" || column >= start + columns {
+            break
+        }
+        let width = if part.text == "\t" {
+            8 - column % 8
+        } else {
+            maximum(1, part.width)
+        };
+        let left = maximum(column, start);
+        let right = minimum(column + width, start + columns);
+        if left < right {
+            let text = if left == column && right == column + width && part.text != "\t" {
+                part.text
+            } else {
+                " ".repeat(right - left)
+            };
+            result.push(ansi::Span { text, style: part.style, link: part.link });
+        }
+        column += width;
+    }
+    result
+}
+
+fn prefix_tail(prefix: ansi::StyledText) -> string {
+    let parts = prefix.graphemes(unicode_text::WidthOptions::new());
+    if parts.is_empty() {
+        ""
+    } else {
+        parts[parts.len() - 1].text
+    }
+}
+
+fn first_cell_width(tail: string, part: ansi::StyledGrapheme) -> isize {
+    if tail == "" {
+        maximum(1, part.width)
+    } else {
+        cell_width(ansi::StyledText::plain(tail + part.text))
+            - cell_width(ansi::StyledText::plain(tail))
+    }
+}
+
+fn push_wrapped(
+    result: Vec[ansi::StyledText],
+    line: ansi::StyledText,
+    bytes: Ref[isize],
+    options: Options,
+) -> Result[(), Error] {
+    let count = line.plain_text().byte_len();
+    if result.len() >= options.max_lines || count > options.max_output_bytes - bytes.get() {
+        return Result::Err(failure("Markdown wrapping output budget exceeded"))
+    }
+    bytes.set(bytes.get() + count);
+    result.push(line);
+    Result::Ok(())
+}
+
+fn wrap_cells(
+    text: ansi::StyledText,
+    width: isize,
+    options: Options,
+    first_prefix: ansi::StyledText,
+    rest_prefix: ansi::StyledText,
+) -> Result[Vec[ansi::StyledText], Error] {
+    let plain = text.plain_text();
+    if plain.byte_len() > options.max_output_bytes {
+        return Result::Err(failure("Markdown wrapping input budget exceeded"))
+    }
+    let parts = text.graphemes(unicode_text::WidthOptions::new());
+    let opportunities = unicode_text::line_breaks(plain);
+    let allowed = Vec::new();
+    let mut offset = 0;
+    let mut opportunity = 0;
+    for part in parts {
+        offset += part.text.byte_len();
+        while opportunity < opportunities.len() && opportunities[opportunity].offset < offset {
+            opportunity += 1;
+        }
+        allowed.push(
+            opportunity < opportunities.len() && opportunities[opportunity].offset == offset,
+        );
+    }
+    let first_tail = prefix_tail(first_prefix);
+    let rest_tail = prefix_tail(rest_prefix);
+    let result = Vec::new();
+    let bytes = Ref::new(0);
+    let mut start = 0;
+    loop {
+        let mut end = start;
+        while end < parts.len() && parts[end].text != "\n" && parts[end].text != "\u2028"
+            && parts[end].text != "\u2029" {
+            end += 1;
+        }
+        if start == end {
+            push_wrapped(result, ansi::StyledText::new(), bytes, options)?;
+        }
+        while start < end {
+            let tail = if result.is_empty() {
+                first_tail
+            } else {
+                rest_tail
+            };
+            let mut at = start;
+            let mut used = 0;
+            let mut trailing = 0;
+            let mut best = start;
+            while at < end {
+                let occupied = if at == start {
+                    first_cell_width(tail, parts[at])
+                } else {
+                    maximum(1, parts[at].width)
+                };
+                used += occupied;
+                trailing = if parts[at].text == " " {
+                    trailing + occupied
+                } else {
+                    0
+                };
+                if used - trailing > width {
+                    break
+                }
+                at += 1;
+                if allowed[at - 1] {
+                    best = at;
+                }
+            }
+            let finish = if at == end {
+                end
+            } else if best > start {
+                best
+            } else {
+                maximum(start + 1, at)
+            };
+            let mut visible_end = finish;
+            while visible_end > start && parts[visible_end - 1].text == " " {
+                visible_end -= 1;
+            }
+            let line = ansi::StyledText::new();
+            for index in start..visible_end {
+                let part = parts[index];
+                line.push(ansi::Span { text: part.text, style: part.style, link: part.link });
+            }
+            push_wrapped(result, line, bytes, options)?;
+            start = finish;
+            while start < end && parts[start].text == " " {
+                start += 1;
+            }
+        }
+        if end == parts.len() {
+            break
+        }
+        start = end + 1;
+    }
+    Result::Ok(result)
+}
+
+fn wrap_literal_cells(
+    text: ansi::StyledText,
+    width: isize,
+    options: Options,
+    prefix: ansi::StyledText,
+) -> Result[Vec[ansi::StyledText], Error] {
+    let result = Vec::new();
+    let bytes = Ref::new(0);
+    let tail = prefix_tail(prefix);
+    let mut line = ansi::StyledText::new();
+    let mut column = 0;
+    let mut empty = true;
+    for original in text.graphemes(unicode_text::WidthOptions::new()) {
+        if original.text == "\n" {
+            push_wrapped(result, line, bytes, options)?;
+            line = ansi::StyledText::new();
+            column = 0;
+            empty = true;
+            continue
+        }
+        let count = if original.text == "\t" {
+            8 - column % 8
+        } else {
+            1
+        };
+        let part = if original.text == "\t" {
+            ansi::StyledGrapheme { text: " ", width: 1, ..original }
+        } else if original.width > width {
+            ansi::StyledGrapheme { text: "�", width: 1, ..original }
+        } else {
+            original
+        };
+        for _ in 0..count {
+            let mut occupied = if empty {
+                first_cell_width(tail, part)
+            } else {
+                maximum(1, part.width)
+            };
+            if column + occupied > width && !empty {
+                push_wrapped(result, line, bytes, options)?;
+                line = ansi::StyledText::new();
+                column = 0;
+                empty = true;
+                occupied = first_cell_width(tail, part);
+            }
+            line.push(ansi::Span { text: part.text, style: part.style, link: part.link });
+            column += occupied;
+            empty = false;
+        }
+    }
+    push_wrapped(result, line, bytes, options)?;
+    Result::Ok(result)
+}

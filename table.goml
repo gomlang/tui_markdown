@@ -172,7 +172,8 @@ fn try_table(state: Build, block: markdown::Block) -> Result[bool, Error] {
                     value = render_inlines(state, inlines, style, Option::None, 1)?;
                 }
             }
-            let lines = wrap_styled(value, widths[column], state.options)?;
+            let prefix = span("│", state.options.theme.border);
+            let lines = wrap_styled(value, widths[column], state.options, prefix, prefix)?;
             height = maximum(height, lines.len());
             rendered.push(lines);
         }
@@ -184,7 +185,9 @@ fn try_table(state: Build, block: markdown::Block) -> Result[bool, Error] {
                 } else {
                     ansi::StyledText::new()
                 };
-                let padding = maximum(0, widths[column] - cell.width());
+                let probe = span("│", state.options.theme.border);
+                probe.append(cell);
+                let padding = maximum(0, widths[column] - (cell_width(probe) - 1));
                 let before = if alignment[column] == 1 {
                     padding / 2
                 } else if alignment[column] == 2 {
@@ -192,9 +195,19 @@ fn try_table(state: Build, block: markdown::Block) -> Result[bool, Error] {
                 } else {
                     0
                 };
+                let end = cell_width(text) + widths[column] + 1;
                 text.append(span(" ".repeat(before), state.options.theme.text));
                 text.append(cell);
-                text.append(span(" ".repeat(padding - before) + "│", state.options.theme.border));
+                text.append(span(" ".repeat(padding - before), state.options.theme.border));
+                let candidate = text.snapshot();
+                candidate.append(span("│", state.options.theme.border));
+                text.append(
+                    span(
+                        " ".repeat(maximum(0, end - cell_width(candidate))),
+                        state.options.theme.border,
+                    ),
+                );
+                text.append(span("│", state.options.theme.border));
             }
             state.push_line(text)?;
         }
@@ -215,10 +228,13 @@ fn table_border(state: Build, widths: Vec[isize]) -> Result[(), Error] {
     state.push_line(text)
 }
 
-fn wrap_styled(text: ansi::StyledText, width: isize, options: Options) -> Result[
-    Vec[ansi::StyledText],
-    Error,
-] {
+fn wrap_styled(
+    text: ansi::StyledText,
+    width: isize,
+    options: Options,
+    first_prefix: ansi::StyledText,
+    rest_prefix: ansi::StyledText,
+) -> Result[Vec[ansi::StyledText], Error] {
     let normalized = ansi::StyledText::new();
     let mut column = 0;
     for part in text.graphemes(unicode_text::WidthOptions::new()) {
@@ -233,43 +249,8 @@ fn wrap_styled(text: ansi::StyledText, width: isize, options: Options) -> Result
         if part.text == "\n" {
             column = 0;
         } else {
-            column += unicode_text::width(value);
+            column += cell_width(ansi::StyledText::plain(value));
         }
     }
-    let wrapped = unicode_text::wrap_configured(
-        normalized.plain_text(),
-        unicode_text::WrapOptions {
-            limits: unicode_text::LayoutLimits {
-                max_input_bytes: options.max_output_bytes,
-                max_output_bytes: options.max_output_bytes,
-                max_lines: options.max_lines,
-            },
-            ..unicode_text::WrapOptions::new(width),
-        },
-    ).map_err(|error| failure(error.to_string()))?;
-    let spans = normalized.spans();
-    let mut index = 0;
-    let mut offset = 0;
-    let result = Vec::new();
-    for line in wrapped {
-        while index < spans.len() && offset + spans[index].text.byte_len() <= line.start {
-            offset += spans[index].text.byte_len();
-            index += 1;
-        }
-        let text = ansi::StyledText::new();
-        let mut at = index;
-        let mut start = offset;
-        while at < spans.len() && start < line.end {
-            let value = spans[at];
-            let left = maximum(0, line.start - start);
-            let right = minimum(value.text.byte_len(), line.end - start);
-            if right > left {
-                text.push(ansi::Span { text: value.text.byte_slice(left, right), ..value });
-            }
-            start += value.text.byte_len();
-            at += 1;
-        }
-        result.push(text.truncate(width).map_err(|error| failure(error.to_string()))?);
-    }
-    Result::Ok(result)
+    wrap_cells(normalized, width, options, first_prefix, rest_prefix)
 }

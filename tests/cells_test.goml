@@ -1,0 +1,193 @@
+package tests;
+
+use ecosystem::tui_markdown;
+use ecosystem::tui;
+use ecosystem::ansi;
+use ecosystem::unicode_text;
+use std::testing;
+
+#[test]
+fn cell_layout_preserves_text_after_standalone_zero_width_clusters() -> () {
+    for prefix in["\u0301", "\u200b", "\u2060"] {
+        let viewer = testing::expect_ok(
+            tui_markdown::Viewer::new(prefix + "XY", tui_markdown::Options::defaults(2)),
+            "zero-width viewer",
+        );
+        let output = testing::expect_ok(tui::Buffer::new(2, 2), "buffer");
+        testing::assert_ok(viewer.draw(output, output.area()));
+        testing::assert(output.lines().join("").contains("Y"));
+        testing::assert_eq(viewer.line_count(), 2);
+        testing::assert_eq(viewer.snapshot().plain_text().replace("\n", ""), prefix + "XY");
+        testing::assert_ok(output.validate());
+    }
+}
+
+#[test]
+fn cell_layout_combining_marks_join_prefixes_without_being_lost() -> () {
+    for (source, expected) in[
+        ("# \u0301XY", "# \u0301XY"),
+        ("> \u0301XY", "│ \u0301XY"),
+        ("- \u0301XY", "• \u0301XY"),
+    ] {
+        let viewer = testing::expect_ok(
+            tui_markdown::Viewer::new(source, tui_markdown::Options::defaults(4)),
+            "prefixed viewer",
+        );
+        let output = testing::expect_ok(tui::Buffer::new(4, 1), "buffer");
+        testing::assert_ok(viewer.draw(output, output.area()));
+        testing::assert_eq(viewer.line_count(), 1);
+        testing::assert_eq(output.lines()[0], expected);
+    }
+}
+
+#[test]
+fn cell_layout_literal_code_keeps_every_grapheme() -> () {
+    let viewer = testing::expect_ok(
+        tui_markdown::Viewer::new("```\n\u0301XY\n```", tui_markdown::Options::defaults(1)),
+        "code viewer",
+    );
+    let output = testing::expect_ok(tui::Buffer::new(1, 5), "buffer");
+    testing::assert_ok(viewer.draw(output, output.area()));
+    testing::assert_eq(viewer.snapshot().plain_text(), "┌\n\u0301\nX\nY\n└");
+    testing::assert_eq(output.lines().join("\n"), "┌\n◌\u0301\nX\nY\n└");
+}
+
+#[test]
+fn cell_layout_tables_keep_borders_and_body_text_in_their_columns() -> () {
+    for marker in["\u0301", "\u200b"] {
+        for delimiter in["---", ":---:", "---:"] {
+            let viewer = testing::expect_ok(
+                tui_markdown::Viewer::new(
+                    "| A |\n| " + delimiter + " |\n| " + marker + "XYZ |",
+                    tui_markdown::Options {
+                        pipe_tables: true,
+                        ..tui_markdown::Options::defaults(5),
+                    },
+                ),
+                "table viewer",
+            );
+            let output = testing::expect_ok(tui::Buffer::new(5, viewer.line_count()), "buffer");
+            testing::assert_ok(viewer.draw(output, output.area()));
+            testing::assert(output.lines().join("").contains("Z"));
+            for row in 0..viewer.line_count() {
+                let first = testing::expect_some(output.get(0, row), "first cell");
+                if first.text.starts_with("│") {
+                    testing::assert_eq(
+                        testing::expect_some(output.get(4, row), "last cell").text,
+                        "│",
+                    );
+                }
+            }
+            testing::assert_ok(output.validate());
+        }
+    }
+}
+
+#[test]
+fn cell_layout_retains_maximum_size_standalone_graphemes() -> () {
+    let cluster = "\u0301".repeat(2048);
+    let viewer = testing::expect_ok(
+        tui_markdown::Viewer::new(cluster + "XY", tui_markdown::Options::defaults(2)),
+        "large cluster",
+    );
+    let output = testing::expect_ok(tui::Buffer::new(2, 2), "buffer");
+    testing::assert_ok(viewer.draw(output, output.area()));
+    testing::assert_eq(testing::expect_some(output.get(0, 0), "large cell").text, "◌" + cluster);
+    testing::assert(output.lines().join("").contains("Y"));
+    let prefixed = testing::expect_ok(
+        tui_markdown::Viewer::new("> " + cluster + "XY", tui_markdown::Options::defaults(4)),
+        "oversized joined cluster",
+    );
+    let prefixed_output = testing::expect_ok(tui::Buffer::new(4, 2), "prefixed buffer");
+    testing::assert_err(prefixed.draw(prefixed_output, prefixed_output.area()));
+}
+
+#[test]
+fn cell_layout_preserves_styles_links_search_ranges_and_output_budgets() -> () {
+    let options = tui_markdown::Options {
+        link_numbers: false,
+        ..tui_markdown::Options::defaults(2),
+    };
+    let viewer = testing::expect_ok(
+        tui_markdown::Viewer::new("[**\u0301XY**](/target)", options),
+        "styled viewer",
+    );
+    let snapshot = viewer.snapshot();
+    testing::assert_eq(snapshot.links[0].line, 0);
+    testing::assert_eq(snapshot.links[0].label, "\u0301XY");
+    for line in snapshot.lines {
+        for part in line.graphemes(unicode_text::WidthOptions::new()) {
+            testing::assert_eq(
+                part.style.attributes & (ansi::BOLD | ansi::UNDERLINE),
+                ansi::BOLD | ansi::UNDERLINE,
+            );
+            testing::assert_eq(testing::expect_some(part.link, "retained link").url(), "/target");
+        }
+    }
+    testing::assert_eq(testing::expect_ok(viewer.search("Y"), "search"), 1);
+    testing::assert_eq(
+        viewer.search_matches()[0],
+        tui_markdown::SearchMatch { line: 1, start: 0, end: 1 },
+    );
+    let output = testing::expect_ok(tui::Buffer::new(2, 2), "buffer");
+    testing::assert_ok(viewer.draw(output, output.area()));
+    testing::assert_eq(
+        testing::expect_some(output.get(0, 1), "search cell").style,
+        options.theme.search,
+    );
+    testing::assert_ok(viewer.select_link(0));
+    testing::assert_ok(viewer.draw(output, output.area()));
+    testing::assert_eq(
+        testing::expect_some(output.get(0, 1), "selected cell").style,
+        options.theme.selected_link,
+    );
+    for (lines, bytes, accepted) in[(2, 6, true), (1, 6, false), (2, 5, false)] {
+        let result = tui_markdown::layout(
+            "\u0301XY",
+            tui_markdown::Options { max_lines: lines, max_output_bytes: bytes, ..options },
+        );
+        testing::assert_eq(result.is_ok(), accepted);
+    }
+}
+
+#[test]
+fn cell_layout_tables_keep_terminal_prepend_clusters_before_the_border() -> () {
+    for body in["XY\u0600", "\u200bX\u0600", "\u0301XY\u0600"] {
+        let viewer = testing::expect_ok(
+            tui_markdown::Viewer::new(
+                "| A |\n| --- |\n| " + body + " |",
+                tui_markdown::Options { pipe_tables: true, ..tui_markdown::Options::defaults(5) },
+            ),
+            "prepend table",
+        );
+        let output = testing::expect_ok(tui::Buffer::new(5, viewer.line_count()), "buffer");
+        testing::assert_ok(viewer.draw(output, output.area()));
+        for row in 0..viewer.line_count() {
+            let first = testing::expect_some(output.get(0, row), "first cell");
+            if first.text.starts_with("│") {
+                testing::assert_eq(testing::expect_some(output.get(4, row), "last cell").text, "│");
+            }
+        }
+    }
+}
+
+#[test]
+fn cell_layout_uses_the_real_list_marker_before_wrapping_keycap_marks() -> () {
+    for width in 2..5 {
+        for mark in["\uFE0F", "\u20E3", "\uFE0F\u20E3"] {
+            let viewer = testing::expect_ok(
+                tui_markdown::Viewer::new(
+                    "123. " + mark + "XYZ",
+                    tui_markdown::Options::defaults(width),
+                ),
+                "list marker joining",
+            );
+            let plain = viewer.snapshot().plain_text();
+            testing::assert(plain.contains("X") && plain.contains("Y") && plain.contains("Z"));
+            testing::assert(plain.contains(mark));
+            let output = testing::expect_ok(tui::Buffer::new(width, viewer.line_count()), "buffer");
+            testing::assert_ok(viewer.draw(output, output.area()));
+            testing::assert(output.lines().join("").contains("X"));
+        }
+    }
+}

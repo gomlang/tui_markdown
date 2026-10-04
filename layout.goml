@@ -24,7 +24,7 @@ impl Build {
     }
 
     fn push_line(self: Build, line: ansi::StyledText) -> Result[(), Error] {
-        let line = line.truncate(self.options.width).map_err(|error| failure(error.to_string()))?;
+        let line = cell_clip(line, 0, self.options.width);
         let bytes = line.plain_text().byte_len();
         if self.lines.len() >= self.options.max_lines
             || bytes + 1 > self.options.max_output_bytes - self.bytes.get() {
@@ -52,8 +52,8 @@ impl Build {
         let prefix = prefix.truncate(self.options.width - 1).map_err(
             |error| failure(error.to_string()),
         )?;
-        let available = maximum(1, self.options.width - prefix.width());
-        let lines = content.wrap(available).map_err(|error| failure(error.to_string()))?;
+        let available = maximum(1, self.options.width - cell_width(prefix));
+        let lines = wrap_literal_cells(content, available, self.options, prefix)?;
         for value in lines {
             let line = prefix.snapshot();
             line.append(value);
@@ -74,9 +74,9 @@ impl Build {
         let rest_prefix = rest_prefix.truncate(self.options.width - 1).map_err(
             |error| failure(error.to_string()),
         )?;
-        let prefix_width = maximum(first_prefix.width(), rest_prefix.width());
+        let prefix_width = maximum(cell_width(first_prefix), cell_width(rest_prefix));
         let available = maximum(1, self.options.width - prefix_width);
-        let lines = wrap_styled(content, available, self.options)?;
+        let lines = wrap_styled(content, available, self.options, first_prefix, rest_prefix)?;
         for index in 0..lines.len() {
             let prefix = if index == 0 {
                 first_prefix
@@ -85,9 +85,7 @@ impl Build {
             };
             let line = prefix.snapshot();
             line.append(lines[index]);
-            self.push_line(
-                line.truncate(self.options.width).map_err(|error| failure(error.to_string()))?,
-            )?;
+            self.push_line(line)?;
         }
         Result::Ok(())
     }
@@ -129,7 +127,14 @@ fn build(document: markdown::Document, options: Options, source_lines: Vec[strin
         metadata_bytes: Ref::new(0),
         source_lines,
     };
-    render_blocks(state, document.blocks, ansi::StyledText::new(), 0, false)?;
+    render_blocks(
+        state,
+        document.blocks,
+        ansi::StyledText::new(),
+        ansi::StyledText::new(),
+        0,
+        false,
+    )?;
     if options.link_footnotes && !state.links.is_empty() {
         state.blank()?;
         let links = state.links.copy();
@@ -185,11 +190,18 @@ fn render_blocks(
     state: Build,
     blocks: Vec[markdown::Block],
     prefix: ansi::StyledText,
+    first_prefix: ansi::StyledText,
     depth: isize,
     tight: bool,
 ) -> Result[(), Error] {
+    let before = state.lines.len();
     for block in blocks {
         state.tick(depth)?;
+        let first = if state.lines.len() == before {
+            first_prefix
+        } else {
+            prefix
+        };
         match block.kind {
             Paragraph(inlines) => {
                 if depth == 0 && state.options.pipe_tables && try_table(state, block)? {
@@ -202,7 +214,7 @@ fn render_blocks(
                     Option::None,
                     depth + 1,
                 )?;
-                state.emit(text, prefix, prefix)?;
+                state.emit(text, first, prefix)?;
             },
             Heading(level, inlines) => {
                 if level < 1 || level > 6 {
@@ -215,7 +227,7 @@ fn render_blocks(
                     Option::None,
                     depth + 1,
                 )?;
-                let first = prefix.snapshot();
+                let first = first.snapshot();
                 first.append(span("#".repeat(level) + " ", state.options.theme.heading));
                 let rest = prefix.snapshot();
                 rest.append(span(" ".repeat(level + 1), state.options.theme.heading));
@@ -225,7 +237,7 @@ fn render_blocks(
                 if code.byte_len() > state.options.max_output_bytes {
                     return Result::Err(failure("code block byte limit exceeded"))
                 }
-                let border = prefix.snapshot();
+                let border = first.snapshot();
                 border.append(span("┌ " + info, state.options.theme.border));
                 state.push_line(
                     border.truncate(state.options.width).map_err(|error| failure(error.to_string()))?,
@@ -246,12 +258,14 @@ fn render_blocks(
                 state.push_line(border)?;
             },
             Html(value) => {
-                state.emit(span(value, state.options.theme.muted), prefix, prefix)?;
+                state.emit(span(value, state.options.theme.muted), first, prefix)?;
             },
             Quote(children) => {
                 let lead = prefix.snapshot();
                 lead.append(span("│ ", state.options.theme.quote));
-                render_blocks(state, children, lead, depth + 1, tight)?;
+                let first = first.snapshot();
+                first.append(span("│ ", state.options.theme.quote));
+                render_blocks(state, children, lead, first, depth + 1, tight)?;
             },
             List(ordered, start, list_tight, items) => {
                 if start < 0 || start > 999999999 {
@@ -268,31 +282,28 @@ fn render_blocks(
                     lead.append(
                         span(" ".repeat(unicode_text::width(marker)), state.options.theme.text),
                     );
+                    let item_first = if index == 0 {
+                        first.snapshot()
+                    } else {
+                        prefix.snapshot()
+                    };
+                    item_first.append(span(marker, state.options.theme.text));
                     let before = state.lines.len();
-                    render_blocks(state, items[index], lead, depth + 1, list_tight)?;
+                    render_blocks(state, items[index], lead, item_first, depth + 1, list_tight)?;
                     if state.lines.len() == before {
-                        state.push_line(prefix.snapshot())?;
+                        state.push_line(
+                            item_first.truncate(state.options.width - 1).map_err(
+                                |error| failure(error.to_string()),
+                            )?,
+                        )?;
                     }
-                    let original = state.lines[before];
-                    let line = prefix.snapshot();
-                    line.append(span(marker, state.options.theme.text));
-                    let lead_width = minimum(lead.width(), state.options.width - 1);
-                    let line = line.truncate(lead_width).map_err(|error| failure(error.to_string()))?;
-                    line.append(
-                        original.clip(lead_width, state.options.width - lead_width).map_err(
-                            |error| failure(error.to_string()),
-                        )?,
-                    );
-                    state.lines[before] = line.truncate(state.options.width).map_err(
-                        |error| failure(error.to_string()),
-                    )?;
                 }
             },
             ThematicBreak => {
-                let line = prefix.snapshot();
+                let line = first.snapshot();
                 line.append(
                     span(
-                        "─".repeat(maximum(0, state.options.width - prefix.width())),
+                        "─".repeat(maximum(0, state.options.width - cell_width(first))),
                         state.options.theme.border,
                     ),
                 );

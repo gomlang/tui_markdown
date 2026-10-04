@@ -47,7 +47,7 @@ Supported terminal presentations include:
 
 `Link.index` is a one-based displayed number. Each link stores its decoded URL, title, plain label and first displayed line. Repeated destinations remain separate links. Safe destinations use the Markdown library's relative/http/https/mailto/ftp policy and additionally reject empty URLs, terminal controls and URLs longer than 4,096 bytes. Unsafe destinations retain their labels but receive neither a selectable link nor OSC 8 metadata. `safe_destination` exposes that policy. The library never opens a link itself.
 
-Line wrapping uses Unicode line-break opportunities, trims paragraph wrapping spaces, and breaks long words when necessary. Code blocks preserve spaces and wrap by columns. Width policies follow the Unicode module defaults. Rendering is left-to-right terminal layout; bidirectional shaping and font-specific width negotiation are not implemented.
+Line wrapping uses Unicode line-break opportunities, trims paragraph wrapping spaces, and breaks long words when necessary. Code blocks preserve spaces and wrap by columns. Layout measures the cells occupied by `tui::Buffer`: a standalone zero-width grapheme occupies one cell, while a combining mark that joins a prefix uses the resulting combined width. List markers, table padding and borders participate in this measurement. `Layout.lines` retains the original grapheme text and its style and hyperlink according to ANSI's first-span policy: a grapheme joining a prefix inherits that prefix span's metadata. The buffer adds its own dotted-circle display fallback when needed. Rendering is left-to-right terminal layout; bidirectional shaping and font-specific width negotiation are not implemented.
 
 At narrow widths, heading, quote, list and code prefixes are clipped to leave at least one column for content. This also applies to deeply nested containers, so decorative indentation cannot hide all of a line's text.
 
@@ -76,7 +76,7 @@ The viewer does not own a terminal session. Draw it inside `tui::Terminal::draw`
 
 ## Limits and verification
 
-Default limits are width 1–4,096 columns, 1 MiB source/AST text, 4 MiB layout text, 65,536 lines, depth 64, 100,000 traversal nodes and 4,096 links. Options validate upper bounds (4 MiB input, 16 MiB output, 262,144 lines, depth 128, 250,000 nodes, 16,384 links). Search retains at most 16,384 matches. Copied link labels/URLs/titles share a separate metadata budget equal to `max_output_bytes`, preventing manually nested links from multiplying metadata without a limit. ANSI stream rendering also enforces a 16 MiB output limit.
+Default limits are width 1–4,096 columns, 1 MiB source/AST text, 4 MiB layout text, 65,536 lines, depth 64, 100,000 traversal nodes and 4,096 links. Options validate upper bounds (4 MiB input, 16 MiB output, 262,144 lines, depth 128, 250,000 nodes, 16,384 links). Search retains at most 16,384 matches. Copied link labels/URLs/titles share a separate metadata budget equal to `max_output_bytes`, preventing manually nested links from multiplying metadata without a limit. ANSI stream rendering also enforces a 16 MiB output limit. Drawing follows the TUI buffer's 4,096-byte input limit per grapheme. A standalone grapheme of that size is retained; if it combines with a layout prefix and exceeds the limit, `Viewer.draw` returns the buffer error.
 
 The final block's blank separator is omitted and does not consume the layout's
 line or byte budget. A single-line paragraph fits `max_lines: 1`; blank
