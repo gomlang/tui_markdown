@@ -76,6 +76,10 @@ The viewer does not own a terminal session. Draw it inside `tui::Terminal::draw`
 
 Default limits are width 1–4,096 columns, 1 MiB source/AST text, 4 MiB layout text, 65,536 lines, depth 64, 100,000 traversal nodes and 4,096 links. Options validate upper bounds (4 MiB input, 16 MiB output, 262,144 lines, depth 128, 250,000 nodes, 16,384 links). Search retains at most 16,384 matches. Copied link labels/URLs/titles share a separate metadata budget equal to `max_output_bytes`, preventing manually nested links from multiplying metadata without a limit. ANSI stream rendering also enforces a 16 MiB output limit.
 
+The final block's blank separator is omitted and does not consume the layout's
+line or byte budget. A single-line paragraph fits `max_lines: 1`; blank
+separators between blocks still count toward the limits.
+
 A preflight traversal checks each child vector length before descending, counts scalar text/URL/title bytes and nodes, and rejects cyclic/deep manually constructed ASTs without bulk-copying child vectors onto an unbounded traversal stack. Formatting uses separate output/traversal limits. Errors contain a recoverable message. Callbacks and concurrent mutation of supplied ASTs are outside the traversal contract.
 
 Tests cover block snapshots, Unicode/style boundaries, safe links and literal HTML, optional table escaping and alignment, cycles and resource limits, viewport/search behavior, snapshot isolation and selected-link visibility after resizing. The example exercises public composition with TUI; `goml verify` also checks the downstream dependency boundary. Native example tests check all 1,110 retained independent layout cases plus eight resource-limit rejection cases. The native GoML PTY verifier exercises Unicode columns, scrolling, code, tables, quotes, link selection, reflow and terminal restoration through a real Linux PTY.

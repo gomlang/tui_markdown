@@ -156,6 +156,43 @@ fn resource_limits_and_manually_constructed_ast_fail_recoverably() -> () {
 }
 
 #[test]
+fn final_block_separator_does_not_consume_layout_limits() -> () {
+    let options = tui_markdown::Options {
+        max_lines: 1,
+        max_output_bytes: 6,
+        ..tui_markdown::Options::defaults(20),
+    };
+    let one = testing::expect_ok(tui_markdown::layout("hello", options), "single line at limit");
+    testing::assert_eq(one.plain_text(), "hello");
+    testing::assert_eq(one.lines.len(), 1);
+    testing::assert(
+        tui_markdown::layout("hello", tui_markdown::Options { max_output_bytes: 5, ..options }).is_err(),
+    );
+    let paragraphs = "hello\n\nworld";
+    let three = testing::expect_ok(
+        tui_markdown::layout(
+            paragraphs,
+            tui_markdown::Options { max_lines: 3, max_output_bytes: 13, ..options },
+        ),
+        "interior separator at limit",
+    );
+    testing::assert_eq(three.plain_text(), paragraphs);
+    testing::assert_eq(three.lines.len(), 3);
+    testing::assert(
+        tui_markdown::layout(
+            paragraphs,
+            tui_markdown::Options { max_lines: 2, max_output_bytes: 13, ..options },
+        ).is_err(),
+    );
+    testing::assert(
+        tui_markdown::layout(
+            paragraphs,
+            tui_markdown::Options { max_lines: 3, max_output_bytes: 12, ..options },
+        ).is_err(),
+    );
+}
+
+#[test]
 fn nested_prefixes_at_narrow_width_remain_bounded() -> () {
     for width in 1..12 {
         let result = rendered(

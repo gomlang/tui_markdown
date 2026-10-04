@@ -37,7 +37,10 @@ impl Build {
 
     fn blank(self: Build) -> Result[(), Error] {
         if !self.lines.is_empty() && self.lines[self.lines.len() - 1].plain_text() != "" {
-            self.push_line(ansi::StyledText::new())?;
+            // A trailing separator is trimmed. Check its budget only if another
+            // line follows; at most one provisional blank is retained.
+            self.lines.push(ansi::StyledText::new());
+            self.bytes.set(self.bytes.get() + 1);
         }
         Result::Ok(())
     }
