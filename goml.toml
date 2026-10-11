@@ -9,4 +9,4 @@ path = "ecosystem::tui_markdown"
 "ecosystem::terminal" = true
 
 [dev-dependencies]
-"ecosystem::verification" = true
+"ecosystem::testkit" = true

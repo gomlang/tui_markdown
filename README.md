@@ -87,17 +87,17 @@ A preflight traversal checks each child vector length before descending, counts 
 Tests cover block snapshots, Unicode/style boundaries, safe links and literal HTML, optional table escaping and alignment, cycles and resource limits, viewport/search behavior, snapshot isolation and selected-link visibility after resizing. The example exercises public composition with TUI; the ecosystem verifier also checks the downstream dependency boundary. Native example tests check all 1,110 retained independent layout cases plus eight resource-limit rejection cases. The native GoML PTY verifier exercises Unicode columns, scrolling, code, tables, quotes, link selection, reflow and terminal restoration through a real Linux PTY.
 
 ```sh
-(cd ../verification && just ecosystem-test tui_markdown)
+(cd ../workflows && just ecosystem-test tui_markdown)
 ```
 
 ## Development and examples
 
-Requires a current GoML toolchain supporting unversioned registry dependencies; see [the pinned ecosystem toolchain](https://github.com/gomlang/verification/blob/main/ci/toolchain.json). The `examples/basic/` example shares the root manifest; test-only helpers are declared in `[dev-dependencies]`. From the library root, run:
+Requires a current GoML toolchain supporting unversioned registry dependencies; see [the pinned ecosystem toolchain](https://github.com/gomlang/workflows/blob/main/ci/toolchain.json). The `examples/basic/` example shares the root manifest; test-only helpers are declared in `[dev-dependencies]`. From the library root, run:
 
 ```sh
 goml run --example basic
 goml test
-(cd ../verification && just ecosystem-test tui_markdown)
+(cd ../workflows && just ecosystem-test tui_markdown)
 ```
 
 `goml test` builds the example and runs its tests. The ecosystem verifier uses an isolated registry snapshot and runs the library-specific smoke and compatibility checks.
@@ -112,5 +112,5 @@ repository includes that manifest. CI prepares the declared native Go dependenci
 Before local verification, fetch them from this repository root:
 
 ```sh
-python3 ../verification/ci/ecosystem.py native --libraries .. --module tui_markdown
+python3 ../workflows/ci/ecosystem.py native --libraries .. --module tui_markdown
 ```

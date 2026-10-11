@@ -1,19 +1,21 @@
 package tests;
 
-use ecosystem::verification::reference;
+use ecosystem::testkit::reference;
 use std::encoding::hex;
 use std::num;
 use std::bytes;
+use std::fs;
+use std::env;
 use std::testing;
 use std::utf8;
 use utf8::BytesUtf8;
 
 #[test]
 fn independent_block_table_link_and_wrapping_reference() -> () {
-    let fixture = reference::load();
+    let fixture = reference::load(fixture_path("tests/data/reference.json"));
     let output = testing::expect_ok(
         reference::run(
-            "tui_markdown",
+            example_binary(),
             "--oracle",
             reference::text(reference::field(fixture, "input")),
         ),
@@ -80,7 +82,7 @@ fn reference_protocol_rejects_all_eight_resource_boundaries() -> () {
             + hex::encode(bytes::Bytes::from_string(source))
             + "\n";
         let result = testing::expect_ok(
-            reference::output("tui_markdown", "--oracle", request),
+            reference::output(example_binary(), "--oracle", request),
             "rejected protocol",
         );
         testing::assert(result.status().code() == Option::Some(101));
@@ -89,5 +91,25 @@ fn reference_protocol_rejects_all_eight_resource_boundaries() -> () {
             testing::expect_ok(result.stderr().to_string_utf8(), "stderr"),
             "layout\n",
         );
+    }
+}
+
+fn fixture_path(path: string) -> string {
+    if fs::is_dir("examples/basic") {
+        "examples/basic/" + path
+    } else {
+        path
+    }
+}
+
+fn example_binary() -> string {
+    if let Ok(binary) = env::var_structured("GOML_VERIFY_BINARY") {
+        return binary
+    }
+    let example = "_artifact/bin/examples/basic/basic";
+    if fs::is_file(example) {
+        example
+    } else {
+        "_artifact/bin/tui_markdown"
     }
 }
