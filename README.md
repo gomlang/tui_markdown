@@ -4,10 +4,10 @@ CommonMark terminal layout and an interactive TUI viewer implemented in GoML. It
 
 ```toml
 [dependencies]
-"ecosystem::tui_markdown" = "0.1.0"
-"ecosystem::tui" = "0.1.0"
-"ecosystem::ansi" = "0.1.0"
-"ecosystem::terminal" = "0.1.0"
+"ecosystem::tui_markdown" = true
+"ecosystem::tui" = true
+"ecosystem::ansi" = true
+"ecosystem::terminal" = true
 ```
 
 ```goml
@@ -84,7 +84,7 @@ separators between blocks still count toward the limits.
 
 A preflight traversal checks each child vector length before descending, counts scalar text/URL/title bytes and nodes, and rejects cyclic/deep manually constructed ASTs without bulk-copying child vectors onto an unbounded traversal stack. Formatting uses separate output/traversal limits. Errors contain a recoverable message. Callbacks and concurrent mutation of supplied ASTs are outside the traversal contract.
 
-Tests cover block snapshots, Unicode/style boundaries, safe links and literal HTML, optional table escaping and alignment, cycles and resource limits, viewport/search behavior, snapshot isolation and selected-link visibility after resizing. The example exercises public composition with TUI; `goml verify` also checks the downstream dependency boundary. Native example tests check all 1,110 retained independent layout cases plus eight resource-limit rejection cases. The native GoML PTY verifier exercises Unicode columns, scrolling, code, tables, quotes, link selection, reflow and terminal restoration through a real Linux PTY.
+Tests cover block snapshots, Unicode/style boundaries, safe links and literal HTML, optional table escaping and alignment, cycles and resource limits, viewport/search behavior, snapshot isolation and selected-link visibility after resizing. The example exercises public composition with TUI; the ecosystem verifier also checks the downstream dependency boundary. Native example tests check all 1,110 retained independent layout cases plus eight resource-limit rejection cases. The native GoML PTY verifier exercises Unicode columns, scrolling, code, tables, quotes, link selection, reflow and terminal restoration through a real Linux PTY.
 
 ```sh
 (cd ../verification && just ecosystem-test tui_markdown)
@@ -92,15 +92,15 @@ Tests cover block snapshots, Unicode/style boundaries, safe links and literal HT
 
 ## Development and examples
 
-Requires GoML 0.1.56 or newer. The `examples/basic/` example shares the root manifest; test-only helpers are declared in `[dev-dependencies]`. From the library root, run:
+Requires a current GoML toolchain supporting unversioned registry dependencies; see [the pinned ecosystem toolchain](https://github.com/gomlang/verification/blob/main/ci/toolchain.json). The `examples/basic/` example shares the root manifest; test-only helpers are declared in `[dev-dependencies]`. From the library root, run:
 
 ```sh
 goml run --example basic
 goml test
-goml verify --timeout 300s
+(cd ../verification && just ecosystem-test tui_markdown)
 ```
 
-`goml test` builds the example and runs its tests. `goml verify` repeats the example checks as an independent module against an isolated registry snapshot. `(cd ../verification && just ecosystem-test tui_markdown)` also retains the library-specific smoke and compatibility checks.
+`goml test` builds the example and runs its tests. The ecosystem verifier uses an isolated registry snapshot and runs the library-specific smoke and compatibility checks.
 
 ## Native dependency setup
 
@@ -108,6 +108,9 @@ The HTML dependency includes a managed Go adapter for document parsing and
 sanitization. Projects using this module need a module-root `go.mod`, even when
 they use only the existing text APIs. A minimal Go module with `go 1.26.0` is
 sufficient; GoML generates the adapter requirements and replacements. This
-repository includes that manifest. Fetch the declared native Go dependencies
-before building with readonly module resolution; ecosystem verification and CI
-do this automatically.
+repository includes that manifest. CI prepares the declared native Go dependencies.
+Before local verification, fetch them from this repository root:
+
+```sh
+python3 ../verification/ci/ecosystem.py native --libraries .. --module tui_markdown
+```
