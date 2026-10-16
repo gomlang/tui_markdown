@@ -102,15 +102,5 @@ goml test
 
 `goml test` builds the example and runs its tests. The ecosystem verifier uses an isolated registry snapshot and runs the library-specific smoke and compatibility checks.
 
-## Native dependency setup
-
-The HTML dependency includes a managed Go adapter for document parsing and
-sanitization. Projects using this module need a module-root `go.mod`, even when
-they use only the existing text APIs. A minimal Go module with `go 1.26.0` is
-sufficient; GoML generates the adapter requirements and replacements. This
-repository includes that manifest. CI prepares the declared native Go dependencies.
-Before local verification, fetch them from this repository root:
-
-```sh
-python3 ../workflows/ci/ecosystem.py native --libraries .. --module tui_markdown
-```
+The Markdown and HTML dependencies are implemented in GoML. Consumers need no
+native adapter setup or module-root `go.mod`.
